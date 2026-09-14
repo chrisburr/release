@@ -53,5 +53,4 @@ For fine-grained tokens, you need to generate two tokens with different scopes a
 
 ## Versioning and Deprecation Policy
 
-This action follows [CalVer](https://calver.org/) with the format `YYYY.MM.DD`. The action's behavior, inputs, and outputs have a 60-day deprecation policy.
-
+This action follows [CalVer](https://calver.org/) with the format `YYYY.MM.DD`. Version tags are preceded by the letter `v`. The action's behavior, inputs, and outputs have a 60-day deprecation policy.
