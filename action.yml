@@ -1,6 +1,6 @@
-name: 'update-feedstock-version'
+name: 'release'
 description: 'GitHub Action to update the version of a feedstock.'
-author: Matthew R. Becker
+author: conda-forge
 branding:
   icon: 'rotate-cw'
   color: 'green'

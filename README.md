@@ -1,6 +1,6 @@
-# update-feedstock-version
+# release
 
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/beckermr/update-feedstock-version/main.svg)](https://results.pre-commit.ci/latest/github/beckermr/update-feedstock-version/main) [![tests](https://github.com/beckermr/update-feedstock-version/actions/workflows/tests.yml/badge.svg)](https://github.com/beckermr/update-feedstock-version/actions/workflows/tests.yml)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/conda-forge/release/main.svg)](https://results.pre-commit.ci/latest/github/conda-forge/release/main) [![tests](https://github.com/conda-forge/release/actions/workflows/tests.yml/badge.svg)](https://github.com/conda-forge/release/actions/workflows/tests.yml)
 
 GitHub Action to update the version of a feedstock.
 
@@ -24,7 +24,7 @@ jobs:
     name: update-feedstock-version
     steps:
       - name: run
-        uses: beckermr/update-feedstock-version@main
+        uses: conda-forge/release@main
         with:
           feedstock: <name of feedstock>-feedstock
           version: ${{ inputs.version }}
