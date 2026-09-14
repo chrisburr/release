@@ -50,3 +50,8 @@ For fine-grained tokens, you need to generate two tokens with different scopes a
 | ----------------------- | ---------------------------- | --------------------------------------------- |
 | `github-token`          | upstream feedstock           | pull_request (read/write)                     |
 | `github-token-for-fork` | your fork of the feedstock   | contents (read/write), workflows (read/write) |
+
+## Versioning and Deprecation Policy
+
+This action follows [CalVer](https://calver.org/) with the format `YYYY.MM.DD`. The action's behavior, inputs, and outputs have a 60-day deprecation policy.
+
