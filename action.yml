@@ -23,6 +23,10 @@ inputs:
     description: 'branch name to use for PR'
     required: false
     default: ''
+  feedstock-branch:
+    description: 'the feedstock branch to update (e.g. a maintenance branch like "1.10.x"), defaults to the default branch'
+    required: false
+    default: ''
   github-token-for-fork:
     description: 'GitHub personal access token to use for making commits to the fork of the feedstock'
     required: false
@@ -85,6 +89,7 @@ runs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         repository: conda-forge/${{ inputs.feedstock }}
+        ref: ${{ inputs.feedstock-branch }}
         path: ${{ github.workspace }}/${{ inputs.feedstock }}
         token: ${{ inputs.github-token }}
 
@@ -126,7 +131,7 @@ runs:
         token: ${{ inputs.github-token }}
         branch-token: ${{ case(inputs.github-token-for-fork == '', inputs.github-token, inputs.github-token-for-fork) }}
         path: ${{ inputs.feedstock }}
-        branch: ${{ case(inputs.branch == '', format('{0}/update-feedstock-version', steps.git-user.outputs.user-name), inputs.branch) }}
+        branch: ${{ case(inputs.branch == '', format('{0}/update-feedstock-version{1}', steps.git-user.outputs.user-name, case(inputs.feedstock-branch == '', '', format('/{0}', inputs.feedstock-branch))), inputs.branch) }}
         delete-branch: true
         commit-message: "chore: update version to ${{ inputs.version }}"
         title: "chore: update version to ${{ inputs.version }}"
