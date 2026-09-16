@@ -96,6 +96,8 @@ For fine-grained tokens, you need to generate two tokens with different scopes a
 
 On GitLab the two tokens are read from the `CF_RELEASE_GITHUB_TOKEN` and `CF_RELEASE_GITHUB_TOKEN_FOR_FORK` CI/CD variables respectively.
 
+Fine-grained tokens can only open pull requests on repositories the token owner has write access to, so the account holding them has to be a maintainer of the feedstock. If they are also refused `GET /user`, set the `login` input (GitLab) so that the fork can still be found; the action falls back to `github.actor` on its own.
+
 ## Protecting the Token
 
 The token given to this action can open pull requests on the feedstock and, with `automerge: true`, add the `automerge` label to them. The conda-forge automerge service acts on that label regardless of who opened the pull request, so the token is better thought of as one that can land code in the package than one that can only propose changes.

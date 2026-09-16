@@ -15,6 +15,10 @@ spec:
       type: string
       default: ''
       description: 'branch name to use for PR'
+    login:
+      type: string
+      default: ''
+      description: 'the GitHub account owning the fork, needed only if the tokens cannot read GET /user'
     feedstock-branch:
       type: string
       default: ''
@@ -120,6 +124,7 @@ spec:
         --branch '$[[ inputs.branch ]]' \
         --feedstock-branch '$[[ inputs.feedstock-branch ]]' \
         --commit-message-file "${CF_RELEASE_WORKDIR}/commit-message.txt" \
+        --login '$[[ inputs.login ]]' \
         --automerge '$[[ inputs.automerge ]]'
   after_script:
     - rm -rf "${CF_RELEASE_WORKDIR:-/tmp/cf-release-work}"

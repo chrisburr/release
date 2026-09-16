@@ -93,6 +93,7 @@ runs:
           --branch '${{ inputs.branch }}' \
           --feedstock-branch '${{ inputs.feedstock-branch }}' \
           --commit-message-file '${{ github.workspace }}/cf-release-commit-message.txt' \
+          --login '${{ github.actor }}' \
           --automerge '${{ inputs.automerge }}' \
           --output-file "$GITHUB_OUTPUT"
       env:

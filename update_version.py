@@ -38,10 +38,31 @@ def _github_client(token):
     return Github(auth=Auth.Token(token))
 
 
-def _git_user(user):
-    """The git identity to use for the commit, taken from the token's owner."""
-    email = user.email or f"{user.id}+{user.login}@users.noreply.github.com"
-    return user.login, email
+def _git_user(clients, login_override):
+    """The git identity to commit as, taken from the token's owner.
+
+    A fine-grained token can be refused ``GET /user``, so try every token we
+    have before falling back to a login supplied by the caller.
+    """
+    from github import GithubException
+
+    for client in clients:
+        try:
+            user = client.get_user()
+        except GithubException:
+            LOGGER.info("a token could not read GET /user, trying the next one")
+            continue
+        return user.login, user.email or (
+            f"{user.id}+{user.login}@users.noreply.github.com"
+        )
+
+    if login_override:
+        return login_override, f"{login_override}@users.noreply.github.com"
+
+    raise RuntimeError(
+        "none of the tokens could read GET /user - pass --login to say which "
+        "account the fork belongs to"
+    )
 
 
 def _default_branch_name(login, feedstock_branch):
@@ -133,10 +154,14 @@ def rerender(args):
 def open_pr(args):
     from github import GithubException
 
-    gh = _github_client(os.environ["GH_TOKEN"])
-    fork_token = os.environ.get("GH_TOKEN_FOR_FORK") or os.environ["GH_TOKEN"]
+    token = os.environ["GH_TOKEN"]
+    fork_token = os.environ.get("GH_TOKEN_FOR_FORK") or token
+    gh = _github_client(token)
 
-    login, email = _git_user(gh.get_user())
+    clients = [gh]
+    if fork_token != token:
+        clients.append(_github_client(fork_token))
+    login, email = _git_user(clients, args.login)
     branch = args.branch or _default_branch_name(login, args.feedstock_branch)
     fork_url = f"https://github.com/{login}/{args.feedstock}.git"
 
@@ -260,6 +285,11 @@ def main():
     sub.add_argument("--feedstock-branch", default="")
     sub.add_argument("--commit-message-file", default="")
     sub.add_argument("--output-file", default="")
+    sub.add_argument(
+        "--login",
+        default="",
+        help="the account owning the fork, used when the tokens cannot read GET /user",
+    )
     sub.add_argument("--automerge", default="false", choices=["true", "false"])
 
     args = parser.parse_args()
