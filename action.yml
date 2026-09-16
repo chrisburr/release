@@ -40,45 +40,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: compute git user information
-      id: git-user
-      shell: bash -leo pipefail {0}
-      run: |
-        login=$(gh api user --jq '.login' || echo '')
-        if [[ "${login}" == *"status\":\"4"* ]]; then
-          login=''
-        fi
-        if [[ "${login}" == "" || "${login}" == "null" ]]; then
-          login='${{ github.actor }}'
-        fi
-
-        user_id=$(gh api user --jq '.id' || echo '')
-        if [[ "${user_id}" == *"status\":\"4"* ]]; then
-          user_id=''
-        fi
-        if [[ "${user_id}" == "" || "${user_id}" == "null" ]]; then
-          user_id='${{ github.actor_id }}'
-        fi
-        user_id="${user_id}+"
-
-        email=$(gh api user --jq '.email' || echo '')
-        if [[ "${email}" == *"status\":\"4"* ]]; then
-          email=''
-        fi
-        if [[ "${email}" == "" || "${email}" == "null" ]]; then
-          email=${user_id}${login}@users.noreply.github.com
-        fi
-
-        echo "login: ${login}"
-        echo "email: ${email}"
-
-        echo "user-name=${login}" >> "$GITHUB_OUTPUT"
-        echo "user-email=${email}" >> "$GITHUB_OUTPUT"
-      env:
-        GH_TOKEN: ${{ inputs.github-token }}
-
     - name: setup conda
-      if: ${{ steps.check.outputs.skip != 'true' }}
       uses: mamba-org/setup-micromamba@f457c30a868e4760d3a6fcea5f25dc655b8edf39  # v3.2.1
       with:
         environment-name: update-env
@@ -86,12 +48,15 @@ runs:
         generate-run-shell: false
 
     - name: checkout feedstock
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        repository: conda-forge/${{ inputs.feedstock }}
-        ref: ${{ inputs.feedstock-branch }}
-        path: ${{ github.workspace }}/${{ inputs.feedstock }}
-        token: ${{ inputs.github-token }}
+      shell: bash -leo pipefail {0}
+      run: |
+        # checkout feedstock
+        python ${{ github.action_path }}/update_version.py \
+          clone \
+          '${{ inputs.feedstock }}' \
+          --feedstock-branch '${{ inputs.feedstock-branch }}'
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
 
     - name: updating version to ${{ inputs.version }}
       shell: bash -leo pipefail {0}
@@ -111,48 +76,32 @@ runs:
         python ${{ github.action_path }}/update_version.py \
           rerender \
           '${{ inputs.feedstock }}' \
-          '${{ inputs.version }}'
-      env:
-        GH_TOKEN: ${{ inputs.github-token }}
-
-    - name: create fork (if needed)
-      if: ${{ inputs.github-token-for-fork == '' }}
-      shell: bash -leo pipefail {0}
-      run: |
-        # create fork (if needed)
-        gh repo fork conda-forge/${{ inputs.feedstock }} --clone=false
+          '${{ inputs.version }}' \
+          --commit-message-file '${{ github.workspace }}/cf-release-commit-message.txt'
       env:
         GH_TOKEN: ${{ inputs.github-token }}
 
     - name: create the pull request
       id: pr
-      uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
-      with:
-        token: ${{ inputs.github-token }}
-        branch-token: ${{ case(inputs.github-token-for-fork == '', inputs.github-token, inputs.github-token-for-fork) }}
-        path: ${{ inputs.feedstock }}
-        branch: ${{ case(inputs.branch == '', format('{0}/update-feedstock-version{1}', steps.git-user.outputs.user-name, case(inputs.feedstock-branch == '', '', format('/{0}', inputs.feedstock-branch))), inputs.branch) }}
-        delete-branch: true
-        commit-message: "chore: update version to ${{ inputs.version }}"
-        title: "chore: update version to ${{ inputs.version }}"
-        body: "This pull request updates the version to ${{ inputs.version }}."
-        committer: '${{ steps.git-user.outputs.user-name }} <${{ steps.git-user.outputs.user-email }}>'
-        author: '${{ steps.git-user.outputs.user-name }} <${{ steps.git-user.outputs.user-email }}>'
-        push-to-fork: ${{ steps.git-user.outputs.user-name }}/${{ inputs.feedstock }}
-
-    - name: automerge
-      if: >-
-        inputs.automerge == 'true'
-        && steps.pr.outputs.pull-request-number != ''
       shell: bash -leo pipefail {0}
       run: |
-        # automerge
-        gh pr edit '${{ steps.pr.outputs.pull-request-number }}' --add-label 'automerge'
+        # create the pull request
+        python ${{ github.action_path }}/update_version.py \
+          open-pr \
+          '${{ inputs.feedstock }}' \
+          '${{ inputs.version }}' \
+          --branch '${{ inputs.branch }}' \
+          --feedstock-branch '${{ inputs.feedstock-branch }}' \
+          --commit-message-file '${{ github.workspace }}/cf-release-commit-message.txt' \
+          --automerge '${{ inputs.automerge }}' \
+          --output-file "$GITHUB_OUTPUT"
       env:
         GH_TOKEN: ${{ inputs.github-token }}
+        GH_TOKEN_FOR_FORK: ${{ inputs.github-token-for-fork }}
 
     - name: cleanup feedstock
       if: always()
       shell: bash -leo pipefail {0}
       run: |
         rm -rf ${{ github.workspace }}/${{ inputs.feedstock }}
+        rm -f ${{ github.workspace }}/cf-release-commit-message.txt
