@@ -147,7 +147,9 @@ runs:
       shell: bash -leo pipefail {0}
       run: |
         # automerge
-        gh pr edit '${{ steps.pr.outputs.pull-request-number }}' --add-label 'automerge'
+        gh pr edit '${{ steps.pr.outputs.pull-request-number }}' \
+          --repo 'conda-forge/${{ inputs.feedstock }}' \
+          --add-label 'automerge'
       env:
         GH_TOKEN: ${{ inputs.github-token }}
 
