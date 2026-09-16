@@ -5,6 +5,10 @@ repos:
     - id: ruff-check
       args: [ --fix ]
     - id: ruff-format
+- repo: https://github.com/python-jsonschema/check-jsonschema
+  rev: 0.38.0
+  hooks:
+    - id: check-gitlab-ci
 ci:
     autofix_commit_msg: |
         [pre-commit.ci] auto fixes from pre-commit.com hooks

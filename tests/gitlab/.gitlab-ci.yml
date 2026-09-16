@@ -1,0 +1,15 @@
+# Run by gitlab-ci-local from .github/workflows/tests.yml. The include is local and
+# CF_RELEASE_DIR points back at the checkout so that the branch under test supplies
+# both the template and the Python, rather than whatever is on main.
+stages:
+  - deploy
+
+include:
+  - local: /gitlab/update-version.yml
+    inputs:
+      feedstock: cf-autotick-bot-test-package-feedstock
+      branch: conda-forge-admin/update-feedstock-version-gitlab
+
+update-feedstock-version:
+  variables:
+    CF_RELEASE_DIR: $CI_PROJECT_DIR

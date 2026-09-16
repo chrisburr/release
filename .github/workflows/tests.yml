@@ -83,3 +83,38 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CF_ADMIN_GITHUB_TOKEN }}
 
+  gitlab-tests:
+    runs-on: ubuntu-latest
+    name: gitlab tests
+    needs: tests-with-two-tokens
+    env:
+      FEEDSTOCK: cf-autotick-bot-test-package-feedstock
+      BRANCH: conda-forge-admin/update-feedstock-version-gitlab
+    steps:
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: update feedstock version
+        run: |
+          # gitlab-ci-local runs the job the way a gitlab runner would, so this
+          # exercises the template itself rather than a reimplementation of it
+          npx --yes gitlab-ci-local@4.75.1 \
+            --file tests/gitlab/.gitlab-ci.yml \
+            --variable CI_COMMIT_TAG=v0.13 \
+            --variable CF_RELEASE_GITHUB_TOKEN="$GH_TOKEN" \
+            update-feedstock-version
+        env:
+          GH_TOKEN: ${{ secrets.CF_ADMIN_GITHUB_TOKEN }}
+
+      - name: close pr and delete pr branch
+        if: always()
+        run: |
+          pr=$(gh pr list --repo "conda-forge/${FEEDSTOCK}" --head "${BRANCH}" \
+            --json number --jq '.[0].number // empty')
+          if [[ -n "${pr}" ]]; then
+            gh pr close --repo "conda-forge/${FEEDSTOCK}" "${pr}"
+          fi
+          gh api --method DELETE \
+            "repos/conda-forge-admin/${FEEDSTOCK}/git/refs/heads/${BRANCH}" || true
+        env:
+          GH_TOKEN: ${{ secrets.CF_ADMIN_GITHUB_TOKEN }}
