@@ -19,10 +19,14 @@ spec:
       type: string
       default: ''
       description: 'the feedstock branch to update (e.g. a maintenance branch like "1.10.x"), defaults to the default branch'
+    repository:
+      type: string
+      default: conda-forge/release
+      description: 'the GitHub repository to take the code from, override it to test a fork'
     ref:
       type: string
       default: main
-      description: 'the conda-forge/release ref to run, pin this to the same tag as the include URL'
+      description: 'the ref of that repository to run, pin this to the same tag as the include URL'
     job-name:
       type: string
       default: update-feedstock-version
@@ -51,6 +55,7 @@ spec:
 
       # defaulted here rather than under `variables` so that anything already set
       # in the project - a vendored checkout, a mirror - takes precedence
+      export CF_RELEASE_REPO="${CF_RELEASE_REPO:-$[[ inputs.repository ]]}"
       export CF_RELEASE_REF="${CF_RELEASE_REF:-$[[ inputs.ref ]]}"
       export CF_RELEASE_DIR="${CF_RELEASE_DIR:-/tmp/cf-release}"
       export CF_RELEASE_WORKDIR="${CF_RELEASE_WORKDIR:-/tmp/cf-release-work}"
@@ -65,7 +70,7 @@ spec:
       if [ ! -f "${CF_RELEASE_DIR}/update_version.py" ]; then
         # a tarball rather than a clone so that the image does not need git yet
         mkdir -p "${CF_RELEASE_DIR}"
-        curl -fsSL "https://github.com/conda-forge/release/archive/${CF_RELEASE_REF}.tar.gz" \
+        curl -fsSL "https://github.com/${CF_RELEASE_REPO}/archive/${CF_RELEASE_REF}.tar.gz" \
           | tar -xz --strip-components=1 -C "${CF_RELEASE_DIR}"
       fi
 
