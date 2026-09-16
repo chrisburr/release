@@ -44,12 +44,14 @@ For classic tokens, you need read/write permissions for the the `repo` and `work
 
 ### Fine-grained Tokens
 
-For fine-grained tokens, you need to generate two tokens with different scopes and pass them to different inputs. You also need to have an existing fork of the target feedstock. The token persmissions are as follows:
+For fine-grained tokens, you need to generate two tokens with different scopes and pass them to different inputs. You also need to have an existing fork of the target feedstock. The token permissions are as follows:
 
 | Action Input Parameter  | Allowed Repositories         | Repository Scopes (permissions)               |
 | ----------------------- | ---------------------------- | --------------------------------------------- |
 | `github-token`          | upstream feedstock           | pull_request (read/write)                     |
 | `github-token-for-fork` | your fork of the feedstock   | contents (read/write), workflows (read/write) |
+
+Give both tokens an expiry of less than 365 days. conda-forge caps the lifetime of fine-grained tokens, and while only `github-token` names a conda-forge repository, the cap ends up being applied to `github-token-for-fork` as well.
 
 ## Protecting the Token
 
