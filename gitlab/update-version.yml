@@ -1,0 +1,120 @@
+spec:
+  inputs:
+    feedstock:
+      type: string
+      description: 'the name of the feedstock (e.g. "python-feedstock")'
+    version:
+      type: string
+      default: ''
+      description: 'the new version, defaults to $CI_COMMIT_TAG with any leading "v" stripped'
+    automerge:
+      type: boolean
+      default: false
+      description: 'whether to enable automerge on the feedstock PR'
+    branch:
+      type: string
+      default: ''
+      description: 'branch name to use for PR'
+    feedstock-branch:
+      type: string
+      default: ''
+      description: 'the feedstock branch to update (e.g. a maintenance branch like "1.10.x"), defaults to the default branch'
+    ref:
+      type: string
+      default: main
+      description: 'the conda-forge/release ref to run, pin this to the same tag as the include URL'
+    job-name:
+      type: string
+      default: update-feedstock-version
+      description: 'the name of the generated job'
+    stage:
+      type: string
+      default: deploy
+      description: 'the stage the generated job runs in'
+    image:
+      type: string
+      default: 'debian:stable-slim'
+      description: 'the image the job runs in, must run as root and be Debian-like unless it already provides curl, tar, bzip2 and micromamba'
+    rules:
+      type: array
+      default:
+        - if: $CI_COMMIT_TAG
+      description: 'the rules controlling when the job runs'
+---
+"$[[ inputs.job-name ]]":
+  stage: $[[ inputs.stage ]]
+  image: $[[ inputs.image ]]
+  rules: $[[ inputs.rules ]]
+  before_script:
+    - |
+      set -euo pipefail
+
+      # defaulted here rather than under `variables` so that anything already set
+      # in the project - a vendored checkout, a mirror - takes precedence
+      export CF_RELEASE_REF="${CF_RELEASE_REF:-$[[ inputs.ref ]]}"
+      export CF_RELEASE_DIR="${CF_RELEASE_DIR:-/tmp/cf-release}"
+      export CF_RELEASE_WORKDIR="${CF_RELEASE_WORKDIR:-/tmp/cf-release-work}"
+      export CF_RELEASE_ENV="${CF_RELEASE_ENV:-cf-release}"
+      export MAMBA_ROOT_PREFIX="${MAMBA_ROOT_PREFIX:-/tmp/micromamba}"
+
+      if ! command -v curl > /dev/null; then
+        apt-get update -qq
+        apt-get install -y -qq --no-install-recommends ca-certificates curl bzip2
+      fi
+
+      if [ ! -f "${CF_RELEASE_DIR}/update_version.py" ]; then
+        # a tarball rather than a clone so that the image does not need git yet
+        mkdir -p "${CF_RELEASE_DIR}"
+        curl -fsSL "https://github.com/conda-forge/release/archive/${CF_RELEASE_REF}.tar.gz" \
+          | tar -xz --strip-components=1 -C "${CF_RELEASE_DIR}"
+      fi
+
+      if ! command -v micromamba > /dev/null; then
+        curl -fsSL https://micro.mamba.pm/api/micromamba/linux-64/latest \
+          | tar -xj -C /usr/local bin/micromamba
+      fi
+
+      micromamba create --yes --name "${CF_RELEASE_ENV}" \
+        --file "${CF_RELEASE_DIR}/conda-lock.yml"
+  script:
+    - |
+      set -euo pipefail
+
+      VERSION='$[[ inputs.version ]]'
+      VERSION="${VERSION:-${CI_COMMIT_TAG:-}}"
+      VERSION="${VERSION#v}"
+      if [ -z "${VERSION}" ]; then
+        echo "no version was given and there is no CI_COMMIT_TAG to derive one from!" >&2
+        exit 1
+      fi
+
+      if [ -z "${CF_RELEASE_GITHUB_TOKEN:-}" ]; then
+        echo "the CF_RELEASE_GITHUB_TOKEN CI/CD variable is not set!" >&2
+        exit 1
+      fi
+      export GH_TOKEN="${CF_RELEASE_GITHUB_TOKEN}"
+      export GH_TOKEN_FOR_FORK="${CF_RELEASE_GITHUB_TOKEN_FOR_FORK:-}"
+
+      cf_release () {
+        micromamba run --name "${CF_RELEASE_ENV}" \
+          python "${CF_RELEASE_DIR}/update_version.py" "$@"
+      }
+
+      mkdir -p "${CF_RELEASE_WORKDIR}"
+      cd "${CF_RELEASE_WORKDIR}"
+
+      cf_release clone '$[[ inputs.feedstock ]]' \
+        --feedstock-branch '$[[ inputs.feedstock-branch ]]'
+
+      cf_release update-version '$[[ inputs.feedstock ]]' "${VERSION}"
+
+      cf_release rerender '$[[ inputs.feedstock ]]' "${VERSION}" \
+        --commit-message-file "${CF_RELEASE_WORKDIR}/commit-message.txt"
+
+      cf_release open-pr '$[[ inputs.feedstock ]]' "${VERSION}" \
+        --branch '$[[ inputs.branch ]]' \
+        --feedstock-branch '$[[ inputs.feedstock-branch ]]' \
+        --commit-message-file "${CF_RELEASE_WORKDIR}/commit-message.txt" \
+        --automerge '$[[ inputs.automerge ]]'
+  after_script:
+    - rm -rf "${CF_RELEASE_WORKDIR:-/tmp/cf-release-work}"
