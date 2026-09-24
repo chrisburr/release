@@ -1,0 +1,78 @@
+spec:
+  inputs:
+    feedstock:
+      type: string
+      description: 'the name of the feedstock (e.g. "python-feedstock")'
+    version:
+      type: string
+      default: ''
+      description: 'the new version, defaults to $CI_COMMIT_TAG with any leading "v" stripped'
+    feedstock-branch:
+      type: string
+      default: ''
+      description: 'the feedstock branch to update (e.g. a maintenance branch like "1.10.x"), defaults to the default branch'
+    repository:
+      type: string
+      default: conda-forge/release
+      description: 'the GitHub repository to take the script from, override it to test a fork'
+    ref:
+      type: string
+      default: main
+      description: 'the ref of that repository to run, pin this to the same tag as the include URL'
+    webservices-url:
+      type: string
+      default: 'https://services.conda-forge.org'
+      description: 'where conda-forge-webservices runs; change it only to test'
+    job-name:
+      type: string
+      default: update-feedstock-version
+      description: 'the name of the generated job'
+    stage:
+      type: string
+      default: deploy
+      description: 'the stage the generated job runs in'
+    image:
+      type: string
+      default: 'curlimages/curl:8.22.0'
+      description: 'the image the job runs in, which needs only sh and curl'
+    rules:
+      type: array
+      default:
+        - if: $CI_COMMIT_TAG
+      description: 'the rules controlling when the job runs'
+---
+# A job of its own that installs nothing, since anything that runs in the job
+# before the token is sent can read it, and conda-forge takes a token for only
+# 15 minutes after GitLab issues it, which is when the job starts.
+"$[[ inputs.job-name ]]":
+  stage: $[[ inputs.stage ]]
+  image:
+    name: $[[ inputs.image ]]
+    entrypoint: [""]
+  rules: $[[ inputs.rules ]]
+  id_tokens:
+    CF_RELEASE_ID_TOKEN:
+      aud: conda-forge-updater
+  script:
+    - |
+      set -eu
+
+      VERSION='$[[ inputs.version ]]'
+      VERSION="${VERSION:-${CI_COMMIT_TAG:-}}"
+      VERSION="${VERSION#v}"
+      if [ -z "${VERSION}" ]; then
+        echo "no version was given and there is no CI_COMMIT_TAG to derive one from!" >&2
+        exit 1
+      fi
+
+      # CF_RELEASE_DIR, if set, holds a checkout to take the script from
+      SCRIPT="${CF_RELEASE_DIR:-}/trusted_publish.sh"
+      if [ ! -f "${SCRIPT}" ]; then
+        SCRIPT="$(mktemp)"
+        curl --silent --show-error --fail --location \
+          "https://raw.githubusercontent.com/$[[ inputs.repository ]]/$[[ inputs.ref ]]/trusted_publish.sh" \
+          --output "${SCRIPT}"
+      fi
+
+      CF_RELEASE_WEBSERVICES='$[[ inputs.webservices-url ]]' \
+        sh "${SCRIPT}" '$[[ inputs.feedstock ]]' "${VERSION}" '$[[ inputs.feedstock-branch ]]'
