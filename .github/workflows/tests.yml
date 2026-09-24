@@ -11,6 +11,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  trusted-publish-script:
+    runs-on: ubuntu-latest
+    name: trusted publishing script
+    steps:
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: test the script against a stand-in endpoint
+        run: |
+          # dash is sh on the runners; busybox is sh in the GitLab template's image
+          sudo apt-get install -y -qq busybox
+          python -m pip install -q pytest
+          python -m pytest -v tests/test_trusted_publish.py
+
   tests:
     runs-on: ubuntu-latest
     name: tests
