@@ -13,8 +13,9 @@ inputs:
     description: 'the new version'
     required: true
   github-token:
-    description: 'GitHub personal access token to use for making PRs on the feedstock'
-    required: true
+    description: 'GitHub personal access token to use for making PRs on the feedstock; leave it out to use trusted publishing instead'
+    required: false
+    default: ''
   automerge:
     description: 'whether to enable automerge on the feedstock PR'
     required: false
@@ -31,17 +32,58 @@ inputs:
     description: 'GitHub personal access token to use for making commits to the fork of the feedstock'
     required: false
     default: ''
+  webservices-url:
+    description: 'where conda-forge-webservices runs, for trusted publishing; change it only to test'
+    required: false
+    default: 'https://services.conda-forge.org'
 
 outputs:
   pull-request-number:
     description: "the number of the PR that was opened"
-    value: ${{ steps.pr.outputs.pull-request-number }}
+    value: ${{ steps.pr.outputs.pull-request-number || steps.trusted.outputs.pull-request-number }}
 
 runs:
   using: "composite"
   steps:
+    - name: ask conda-forge to update the version to ${{ inputs.version }}
+      id: trusted
+      if: inputs.github-token == ''
+      shell: bash
+      run: |
+        # ask conda-forge to update the version with trusted publishing
+        set -euo pipefail
+
+        if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+          echo "::error::github-token is empty. If you passed a secret, it is not set or not available here (for example, on a pull request from a fork). To use trusted publishing instead, give the job 'permissions: id-token: write'."
+          exit 1
+        fi
+        if [ "${AUTOMERGE}" = true ] || [ -n "${BRANCH}" ]; then
+          echo "::error::automerge and branch need a github-token; conda-forge opens the pull request itself with trusted publishing"
+          exit 1
+        fi
+
+        CF_RELEASE_ID_TOKEN=$(
+          curl --silent --show-error --fail \
+            --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=conda-forge-updater" \
+          | python3 -c 'import json, sys; print(json.load(sys.stdin)["value"])'
+        )
+        echo "::add-mask::${CF_RELEASE_ID_TOKEN}"
+        export CF_RELEASE_ID_TOKEN CF_RELEASE_OUTPUT_FILE="${GITHUB_OUTPUT}"
+
+        sh "${GITHUB_ACTION_PATH}/trusted_publish.sh" \
+          "${FEEDSTOCK}" "${VERSION}" "${FEEDSTOCK_BRANCH}"
+      env:
+        FEEDSTOCK: ${{ inputs.feedstock }}
+        VERSION: ${{ inputs.version }}
+        FEEDSTOCK_BRANCH: ${{ inputs.feedstock-branch }}
+        AUTOMERGE: ${{ inputs.automerge }}
+        BRANCH: ${{ inputs.branch }}
+        CF_RELEASE_WEBSERVICES: ${{ inputs.webservices-url }}
+
     - name: compute git user information
       id: git-user
+      if: inputs.github-token != ''
       shell: bash -leo pipefail {0}
       run: |
         login=$(gh api user --jq '.login' || echo '')
@@ -78,7 +120,7 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
 
     - name: setup conda
-      if: ${{ steps.check.outputs.skip != 'true' }}
+      if: ${{ steps.check.outputs.skip != 'true' && inputs.github-token != '' }}
       uses: mamba-org/setup-micromamba@f457c30a868e4760d3a6fcea5f25dc655b8edf39  # v3.2.1
       with:
         environment-name: update-env
@@ -86,6 +128,7 @@ runs:
         generate-run-shell: false
 
     - name: checkout feedstock
+      if: inputs.github-token != ''
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         repository: conda-forge/${{ inputs.feedstock }}
@@ -94,6 +137,7 @@ runs:
         token: ${{ inputs.github-token }}
 
     - name: updating version to ${{ inputs.version }}
+      if: inputs.github-token != ''
       shell: bash -leo pipefail {0}
       run: |
         # update version to ${{ inputs.version }}
@@ -105,6 +149,7 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
 
     - name: rerendering feedstock
+      if: inputs.github-token != ''
       shell: bash -leo pipefail {0}
       run: |
         # rerendering feedstock
@@ -116,7 +161,7 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
 
     - name: create fork (if needed)
-      if: ${{ inputs.github-token-for-fork == '' }}
+      if: ${{ inputs.github-token != '' && inputs.github-token-for-fork == '' }}
       shell: bash -leo pipefail {0}
       run: |
         # create fork (if needed)
@@ -126,6 +171,7 @@ runs:
 
     - name: create the pull request
       id: pr
+      if: inputs.github-token != ''
       uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
       with:
         token: ${{ inputs.github-token }}
@@ -142,7 +188,8 @@ runs:
 
     - name: automerge
       if: >-
-        inputs.automerge == 'true'
+        inputs.github-token != ''
+        && inputs.automerge == 'true'
         && steps.pr.outputs.pull-request-number != ''
       shell: bash -leo pipefail {0}
       run: |
@@ -154,7 +201,7 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
 
     - name: cleanup feedstock
-      if: always()
+      if: always() && inputs.github-token != ''
       shell: bash -leo pipefail {0}
       run: |
         rm -rf ${{ github.workspace }}/${{ inputs.feedstock }}

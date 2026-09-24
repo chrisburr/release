@@ -97,3 +97,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CF_ADMIN_GITHUB_TOKEN }}
 
+  tests-trusted-publishing:
+    runs-on: ubuntu-latest
+    name: tests with trusted publishing
+    needs: tests-with-two-tokens
+    permissions:
+      contents: read
+      # the test feedstock lists this workflow under trusted_publishers
+      id-token: write
+    steps:
+      - name: update feedstock version
+        id: update
+        uses: $/
+        with:
+          feedstock: cf-autotick-bot-test-package-feedstock
+          version: "0.13"
+
+      - name: close pr
+        if: always() && steps.update.outputs.pull-request-number != ''
+        run: |
+          gh pr close --delete-branch \
+          https://github.com/conda-forge/cf-autotick-bot-test-package-feedstock/pull/${{ steps.update.outputs.pull-request-number }}
+        env:
+          GH_TOKEN: ${{ secrets.CF_ADMIN_GITHUB_TOKEN }}
