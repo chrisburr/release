@@ -26,6 +26,9 @@ jobs:
           python -m pytest -v tests/test_trusted_publish.py
 
   tests:
+    # a pull request from a fork gets neither the secrets nor an identity
+    # token, so these would only fail; the script's tests still run
+    if: ${{ !github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     name: tests
     steps:
@@ -61,6 +64,7 @@ jobs:
           GH_TOKEN: ${{ secrets.CF_ADMIN_GITHUB_TOKEN }}
 
   tests-with-two-tokens:
+    if: ${{ !github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     name: tests with two tokens
     needs: tests
@@ -98,6 +102,7 @@ jobs:
           GH_TOKEN: ${{ secrets.CF_ADMIN_GITHUB_TOKEN }}
 
   tests-trusted-publishing:
+    if: ${{ !github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     name: tests with trusted publishing
     needs: tests-with-two-tokens
