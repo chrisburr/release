@@ -88,10 +88,11 @@ Release from protected tags and set `ref_type: tag` and `ref_protected: true` on
 - One update per feedstock is opened a minute.
 - `automerge` and `branch` need a personal access token, since with trusted publishing conda-forge opens the pull request.
 
-<details>
-<summary>Using a personal access token instead</summary>
+## Using a Personal Access Token
 
-The action can also open the pull request itself with a GitHub personal access token, which is what `automerge` and `branch` need. Trusted publishing is the better choice otherwise: a token has to be stored, can be leaked, and has to be renewed.
+The action can also open the pull request itself with a GitHub personal access token. The  `automerge` and `branch` options require a personal access token. **Trusted publishing is the better choice otherwise: a token has to be stored, can be leaked, and has to be renewed.**
+
+<details>
 
 ### Usage
 
