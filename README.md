@@ -76,7 +76,7 @@ include:
       ref: <tag>
 ```
 
-That adds an `update-feedstock-version` job which runs on tag pipelines and takes the new version from `$CI_COMMIT_TAG`, with any leading `v` stripped. Set the `version` input to override that, and the `rules` input to run the job at some other time. See [gitlab/trusted-publish.yml](gitlab/trusted-publish.yml) for the full list of inputs.
+That adds an `update-feedstock-version` job which runs on tag pipelines and takes the new version from `$CI_COMMIT_TAG`, with any leading `v` stripped. Set the `version` input to override that, and the `rules` input to run the job at some other time. If your runners cannot pull from Docker Hub, set `image-registry` to a mirror of it, such as `registry.example.org/docker.io` or `$CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX` for GitLab's dependency proxy. See [gitlab/trusted-publish.yml](gitlab/trusted-publish.yml) for the full list of inputs.
 
 Release from protected tags and set `ref_type: tag` and `ref_protected: true` on the feedstock's entry, so that only a release can publish.
 

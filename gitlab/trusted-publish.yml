@@ -31,10 +31,14 @@ spec:
       type: string
       default: deploy
       description: 'the stage the generated job runs in'
+    image-registry:
+      type: string
+      default: docker.io
+      description: 'the registry to pull the image through, e.g. a Docker Hub mirror like "registry.example.org/docker.io" or "$CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX"'
     image:
       type: string
       default: 'curlimages/curl:8.22.0'
-      description: 'the image the job runs in, which needs only sh and curl'
+      description: 'the image the job runs in, relative to image-registry, which needs only sh and curl'
     rules:
       type: array
       default:
@@ -47,7 +51,7 @@ spec:
 "$[[ inputs.job-name ]]":
   stage: $[[ inputs.stage ]]
   image:
-    name: $[[ inputs.image ]]
+    name: $[[ inputs.image-registry ]]/$[[ inputs.image ]]
     entrypoint: [""]
   rules: $[[ inputs.rules ]]
   id_tokens:
